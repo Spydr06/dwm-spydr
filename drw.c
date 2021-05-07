@@ -57,7 +57,7 @@ static size_t utf8decode(const char *c, long *u, size_t clen)
 	return len;
 }
 
-Drw* drw_create(Display *dpy, int screen, Window root, unsigned int w, unsigned int h, Visual *visual, unsigned int depth, Colormap cmap)
+Drw* drw_create(Display *dpy, int screen, Window root, unsigned int w, unsigned int h)
 {
 	Drw *drw = ecalloc(1, sizeof(Drw));
 
@@ -66,11 +66,8 @@ Drw* drw_create(Display *dpy, int screen, Window root, unsigned int w, unsigned 
 	drw->root = root;
 	drw->w = w;
 	drw->h = h;
-	drw->visual = visual;
-	drw->depth = depth;
-	drw->cmap = cmap;
-	drw->drawable = XCreatePixmap(dpy, root, w, h, depth);
-	drw->gc = XCreateGC(dpy, drw->drawable, 0, NULL);
+	drw->drawable = XCreatePixmap(dpy, root, w, h, DefaultDepth(dpy, screen));
+	drw->gc = XCreateGC(dpy, root, 0, NULL);
 	XSetLineAttributes(dpy, drw->gc, 1, LineSolid, CapButt, JoinMiter);
 
 	return drw;
@@ -85,7 +82,7 @@ void drw_resize(Drw *drw, unsigned int w, unsigned int h)
 	drw->h = h;
 	if (drw->drawable)
 		XFreePixmap(drw->dpy, drw->drawable);
-	drw->drawable = XCreatePixmap(drw->dpy, drw->root, w, h, drw->depth);
+	drw->drawable = XCreatePixmap(drw->dpy, drw->root, w, h, DefaultDepth(drw->dpy, drw->screen));
 }
 
 void drw_free(Drw *drw)
@@ -126,6 +123,19 @@ static Fnt* xfont_create(Drw *drw, const char *fontname, FcPattern *fontpattern)
 		}
 	} else {
 		die("no font specified.");
+	}
+
+	/* Do not allow using color fonts. This is a workaround for a BadLength
+	 * error from Xft with color glyphs. Modelled on the Xterm workaround. See
+	 * https://bugzilla.redhat.com/show_bug.cgi?id=1498269
+	 * https://lists.suckless.org/dev/1701/30932.html
+	 * https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=916349
+	 * and lots more all over the internet.
+	 */
+	FcBool iscol;
+	if(FcPatternGetBool(xfont->pattern, FC_COLOR, 0, &iscol) == FcResultMatch && iscol) {
+		XftFontClose(drw->dpy, xfont);
+		return NULL;
 	}
 
 	font = ecalloc(1, sizeof(Fnt));
@@ -172,21 +182,20 @@ void drw_fontset_free(Fnt *font)
 	}
 }
 
-void drw_clr_create(Drw *drw, Clr *dest, const char *clrname, unsigned int alpha)
+void drw_clr_create(Drw *drw, Clr *dest, const char *clrname)
 {
 	if (!drw || !dest || !clrname)
 		return;
 
-	if (!XftColorAllocName(drw->dpy, drw->visual, drw->cmap,
+	if (!XftColorAllocName(drw->dpy, DefaultVisual(drw->dpy, drw->screen),
+	                       DefaultColormap(drw->dpy, drw->screen),
 	                       clrname, dest))
 		die("error, cannot allocate color '%s'", clrname);
-
-	dest->pixel = (dest->pixel & 0x00ffffffU) | (alpha << 24);
 }
 
 /* Wrapper to create color schemes. The caller has to call free(3) on the
  * returned color scheme when done using it. */
-Clr* drw_scm_create(Drw *drw, const char *clrnames[], const unsigned int alphas[], size_t clrcount)
+Clr* drw_scm_create(Drw *drw, const char *clrnames[], size_t clrcount)
 {
 	size_t i;
 	Clr *ret;
@@ -196,7 +205,7 @@ Clr* drw_scm_create(Drw *drw, const char *clrnames[], const unsigned int alphas[
 		return NULL;
 
 	for (i = 0; i < clrcount; i++)
-		drw_clr_create(drw, &ret[i], clrnames[i], alphas[i]);
+		drw_clr_create(drw, &ret[i], clrnames[i]);
 	return ret;
 }
 
@@ -248,7 +257,9 @@ int drw_text(Drw *drw, int x, int y, unsigned int w, unsigned int h, unsigned in
 	} else {
 		XSetForeground(drw->dpy, drw->gc, drw->scheme[invert ? ColFg : ColBg].pixel);
 		XFillRectangle(drw->dpy, drw->drawable, drw->gc, x, y, w, h);
-		d = XftDrawCreate(drw->dpy, drw->drawable, drw->visual, drw->cmap);
+		d = XftDrawCreate(drw->dpy, drw->drawable,
+		                  DefaultVisual(drw->dpy, drw->screen),
+		                  DefaultColormap(drw->dpy, drw->screen));
 		x += lpad;
 		w -= lpad;
 	}
