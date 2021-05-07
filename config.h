@@ -32,7 +32,7 @@ static const char *colors[][3]        = {
 };
 
 /* tagging */
-static const char *tags[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+static const char *tags[] = { " 1 ", " 2 ", " 3 ", " 4 ", " 5 ", " 6 ", " 7 ", " 8 ", " 9 " };
 
 static const Rule rules[] = {
 	/* xprop(1):
@@ -85,9 +85,9 @@ static Key keys[] = {
 	{ MODKEY,                       XK_u,      incnmaster,     {.i = -1 } },
 	{ MODKEY|ShiftMask,             XK_h,      setcfact,       {.f = +0.25} },
 	{ MODKEY|ShiftMask,             XK_l,      setcfact,       {.f = -0.25} },
-	{ MODKEY|ShiftMask,             XK_o,      setcfact,       {.f =  0.00} },
-	{ MODKEY,                       XK_v,      setmfact,       {.f = -0.05} },
-	{ MODKEY,                       XK_b,      setmfact,       {.f = +0.05} },
+	{ MODKEY|ShiftMask,             XK_g,      setcfact,       {.f =  0.00} },
+	{ MODKEY,                       XK_o,      setmfact,       {.f = -0.05} },
+	{ MODKEY,                       XK_p,      setmfact,       {.f = +0.05} },
 	{ MODKEY|ShiftMask,             XK_Return, zoom,           {0} },
 	{ MODKEY,                       XK_Tab,    view,           {0} },
 	{ MODKEY|ShiftMask,             XK_q,      killclient,     {0} },
